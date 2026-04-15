@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线留言板</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        .app {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .message-form {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .message-form h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .message-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 16px;
+        }
+        .message-form button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .message-form button:hover {
+            background: #45a049;
+        }
+        .message-list {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .message-list h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .message-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .message-item {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .message-content {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .message-time {
+            font-size: 12px;
+            color: #888;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const API_BASE_URL = 'http://localhost:8000/api';
+
+        // API 服务
+        const getMessages = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/messages`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch messages');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching messages:', error);
+                return [];
+            }
+        };
+
+        const createMessage = async (content) => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content }),
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to create message');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error creating message:', error);
+                throw error;
+            }
+        };
+
+        // 组件
+        const MessageList = ({ messages }) => {
+            return React.createElement(
+                'div',
+                { className: 'message-list' },
+                React.createElement('h2', null, '留言列表'),
+                messages.length === 0 ? (
+                    React.createElement('p', null, '暂无留言')
+                ) : (
+                    React.createElement('ul', null,
+                        messages.map((message) => React.createElement(
+                            'li',
+                            { key: message.id, className: 'message-item' },
+                            React.createElement('div', { className: 'message-content' }, message.content),
+                            React.createElement('div', { className: 'message-time' }, new Date(message.created_at).toLocaleString())
+                        ))
+                    )
+                )
+            );
+        };
+
+        const MessageForm = ({ onSubmit }) => {
+            const [content, setContent] = React.useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (content.trim()) {
+                    onSubmit(content);
+                    setContent('');
+                }
+            };
+
+            return React.createElement(
+                'form',
+                { className: 'message-form', onSubmit: handleSubmit },
+                React.createElement('h2', null, '新增留言'),
+                React.createElement('textarea', {
+                    value: content,
+                    onChange: (e) => setContent(e.target.value),
+                    placeholder: '请输入留言内容',
+                    rows: 4
+                }),
+                React.createElement('button', { type: 'submit' }, '提交')
+            );
+        };
+
+        // 主应用
+        function App() {
+            const [messages, setMessages] = React.useState([]);
+
+            React.useEffect(() => {
+                fetchMessages();
+            }, []);
+
+            const fetchMessages = async () => {
+                const data = await getMessages();
+                setMessages(data);
+            };
+
+            const handleSubmit = async (content) => {
+                await createMessage(content);
+                fetchMessages();
+            };
+
+            return React.createElement(
+                'div',
+                { className: 'app' },
+                React.createElement('h1', null, '在线留言板'),
+                React.createElement(MessageForm, { onSubmit: handleSubmit }),
+                React.createElement(MessageList, { messages: messages })
+            );
+        }
+
+        // 渲染应用
+        ReactDOM.createRoot(document.getElementById('root')).render(
+            React.createElement(App)
+        );
+    </script>
+</body>
+</html>

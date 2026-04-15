@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>留言板测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .message-form {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .message-form h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .message-form textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: inherit;
+            font-size: 16px;
+        }
+        .message-form button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .message-form button:hover {
+            background: #45a049;
+        }
+        .message-list {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .message-list h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .message-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .message-item {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .message-content {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .message-time {
+            font-size: 12px;
+            color: #888;
+            text-align: right;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <h1>在线留言板</h1>
+        <div class="message-form">
+            <h2>新增留言</h2>
+            <textarea id="message-content" placeholder="请输入留言内容" rows="4"></textarea>
+            <button id="submit-btn">提交</button>
+            <div id="error" class="error"></div>
+        </div>
+        <div class="message-list">
+            <h2>留言列表</h2>
+            <ul id="message-list">
+                <li>加载中...</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api';
+
+        // 加载留言列表
+        async function loadMessages() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/messages`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch messages');
+                }
+                const messages = await response.json();
+                renderMessages(messages);
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                document.getElementById('message-list').innerHTML = '<li>加载失败，请刷新页面重试</li>';
+            }
+        }
+
+        // 渲染留言列表
+        function renderMessages(messages) {
+            const messageList = document.getElementById('message-list');
+            if (messages.length === 0) {
+                messageList.innerHTML = '<li>暂无留言</li>';
+                return;
+            }
+
+            messageList.innerHTML = messages.map(message => `
+                <li class="message-item">
+                    <div class="message-content">${message.content}</div>
+                    <div class="message-time">${new Date(message.created_at).toLocaleString()}</div>
+                </li>
+            `).join('');
+        }
+
+        // 提交留言
+        async function submitMessage() {
+            const content = document.getElementById('message-content').value.trim();
+            const errorElement = document.getElementById('error');
+
+            if (!content) {
+                errorElement.textContent = '请输入留言内容';
+                return;
+            }
+
+            errorElement.textContent = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create message');
+                }
+
+                // 清空输入框
+                document.getElementById('message-content').value = '';
+                // 重新加载留言列表
+                loadMessages();
+            } catch (error) {
+                console.error('Error submitting message:', error);
+                errorElement.textContent = '提交失败，请重试';
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMessages();
+            document.getElementById('submit-btn').addEventListener('click', submitMessage);
+        });
+    </script>
+</body>
+</html>
