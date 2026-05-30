@@ -4,6 +4,7 @@ import (
 	"messageboard/dto/request"
 	"messageboard/dto/response"
 	"messageboard/service"
+	"messageboard/utils"
 	"net/http"
 	"strconv"
 
@@ -27,13 +28,13 @@ func (c *CommentController) CreateComment(ctx *gin.Context) {
 	postIDStr := ctx.Param("id")
 	postID, err := strconv.ParseUint(postIDStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "invalid post id"))
+		utils.BadRequest(ctx, "invalid post id")
 		return
 	}
 
 	var req request.CreateCommentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
@@ -41,18 +42,18 @@ func (c *CommentController) CreateComment(ctx *gin.Context) {
 
 	comment, err := c.commentService.CreateComment(uint(postID), userID, req.Content, req.ParentID)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "failed to create comment"))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, response.SuccessResponse(gin.H{
+	utils.Created(ctx, gin.H{
 		"id":         comment.ID,
 		"content":    comment.Content,
 		"post_id":    comment.PostID,
 		"author_id":  comment.AuthorID,
 		"parent_id":  comment.ParentID,
 		"created_at": comment.CreatedAt,
-	}))
+	})
 }
 
 // GetComments 获取评论树
@@ -60,7 +61,7 @@ func (c *CommentController) GetComments(ctx *gin.Context) {
 	postIDStr := ctx.Param("id")
 	postID, err := strconv.ParseUint(postIDStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "invalid post id"))
+		utils.BadRequest(ctx, "invalid post id")
 		return
 	}
 
@@ -73,11 +74,11 @@ func (c *CommentController) GetComments(ctx *gin.Context) {
 
 	comments, err := c.commentService.GetCommentTree(uint(postID), uid)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, err.Error()))
+		utils.InternalError(ctx, response.SafeError(err, "failed to get comments"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(comments))
+	utils.Success(ctx, comments)
 }
 
 // Vote 点赞/取消点赞
@@ -85,13 +86,13 @@ func (c *CommentController) Vote(ctx *gin.Context) {
 	commentIDStr := ctx.Param("id")
 	commentID, err := strconv.ParseUint(commentIDStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "invalid comment id"))
+		utils.BadRequest(ctx, "invalid comment id")
 		return
 	}
 
 	var req request.VoteActionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
@@ -99,11 +100,11 @@ func (c *CommentController) Vote(ctx *gin.Context) {
 
 	voteResp, err := c.voteService.Vote(userID, uint(commentID), req.Action)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "failed to vote"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(voteResp))
+	utils.Success(ctx, voteResp)
 }
 
 // GetVotes 获取点赞数
@@ -111,7 +112,7 @@ func (c *CommentController) GetVotes(ctx *gin.Context) {
 	commentIDStr := ctx.Param("id")
 	commentID, err := strconv.ParseUint(commentIDStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "invalid comment id"))
+		utils.BadRequest(ctx, "invalid comment id")
 		return
 	}
 
@@ -124,9 +125,9 @@ func (c *CommentController) GetVotes(ctx *gin.Context) {
 
 	voteResp, err := c.voteService.GetVoteInfo(uint(commentID), uid)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, err.Error()))
+		utils.InternalError(ctx, response.SafeError(err, "failed to get vote info"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(voteResp))
+	utils.Success(ctx, voteResp)
 }
