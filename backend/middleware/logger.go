@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +14,7 @@ func Logger() gin.HandlerFunc {
 			" | " + param.ClientIP +
 			" | " + param.Method +
 			" | " + param.Path +
-			" | " + string(rune(param.StatusCode)) +
+			" | " + strconv.Itoa(param.StatusCode) +
 			" | " + param.Latency.String() +
 			" | " + param.ErrorMessage + "\n"
 	})
