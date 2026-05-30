@@ -27,6 +27,7 @@ func (r *CommentRepository) FindByID(id uint) (*model.Comment, error) {
 	return &comment, nil
 }
 
+// FindByPostID 获取帖子的所有评论
 func (r *CommentRepository) FindByPostID(postID uint) ([]model.Comment, error) {
 	var comments []model.Comment
 	err := r.db.Where("post_id = ?", postID).

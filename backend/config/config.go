@@ -1,16 +1,18 @@
 package config
 
 import (
-	"fmt"
+	"log"
 	"os"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Upload   UploadConfig
+	Server        ServerConfig
+	Database      DatabaseConfig
+	JWT           JWTConfig
+	Upload        UploadConfig
+	AllowedOrigins []string
 }
 
 type ServerConfig struct {
@@ -37,22 +39,32 @@ type UploadConfig struct {
 var AppConfig *Config
 
 func InitConfig() {
-	mode := getEnv("GIN_MODE", "debug")
+	appEnv := getEnv("APP_ENV", "development")
 
 	jwtSecret := getEnv("JWT_SECRET", "messageboard-secret-key-2024")
-	if mode == "release" {
-		// 生产模式下强制从环境变量读取 JWT_SECRET
-		envSecret := os.Getenv("JWT_SECRET")
-		if envSecret == "" {
-			panic("JWT_SECRET environment variable is required in production mode (GIN_MODE=release)")
+	if appEnv == "production" {
+		jwtSecret = os.Getenv("JWT_SECRET")
+		if jwtSecret == "" {
+			log.Fatal("JWT_SECRET environment variable must be set in production mode")
 		}
-		jwtSecret = envSecret
+	}
+
+	// Parse allowed origins from comma-separated env var
+	allowedOriginsStr := getEnv("ALLOWED_ORIGINS", "")
+	var allowedOrigins []string
+	if allowedOriginsStr != "" {
+		for _, origin := range strings.Split(allowedOriginsStr, ",") {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				allowedOrigins = append(allowedOrigins, origin)
+			}
+		}
 	}
 
 	AppConfig = &Config{
 		Server: ServerConfig{
 			Port: getEnv("SERVER_PORT", "8080"),
-			Mode: mode,
+			Mode: getEnv("GIN_MODE", "debug"),
 		},
 		Database: DatabaseConfig{
 			Driver: "sqlite",
@@ -67,9 +79,8 @@ func InitConfig() {
 			ImageMaxSize:  5 * 1024 * 1024,  // 5MB
 			UploadDir:     getEnv("UPLOAD_DIR", "uploads"),
 		},
+		AllowedOrigins: allowedOrigins,
 	}
-
-	fmt.Printf("[config] Server running in %s mode\n", mode)
 }
 
 func getEnv(key, defaultValue string) string {

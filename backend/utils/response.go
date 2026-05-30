@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log"
 	"messageboard/dto/response"
 	"net/http"
 
@@ -45,4 +46,10 @@ func NotFound(ctx *gin.Context, message string) {
 // InternalError 500 错误响应
 func InternalError(ctx *gin.Context, message string) {
 	ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, message))
+}
+
+// HandleError 统一错误处理：记录详细错误到日志，返回通用错误信息给客户端
+func HandleError(ctx *gin.Context, statusCode int, userMessage string, err error) {
+	log.Printf("[ERROR] %s: %v", userMessage, err)
+	ctx.JSON(statusCode, response.ErrorResponse(statusCode, userMessage))
 }

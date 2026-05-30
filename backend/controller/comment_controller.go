@@ -34,7 +34,7 @@ func (c *CommentController) CreateComment(ctx *gin.Context) {
 
 	var req request.CreateCommentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
+		utils.BadRequest(ctx, "invalid request parameters")
 		return
 	}
 
@@ -42,18 +42,18 @@ func (c *CommentController) CreateComment(ctx *gin.Context) {
 
 	comment, err := c.commentService.CreateComment(uint(postID), userID, req.Content, req.ParentID)
 	if err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "failed to create comment"))
+		utils.HandleError(ctx, http.StatusBadRequest, "failed to create comment", err)
 		return
 	}
 
-	utils.Created(ctx, gin.H{
+	ctx.JSON(http.StatusCreated, response.SuccessResponse(gin.H{
 		"id":         comment.ID,
 		"content":    comment.Content,
 		"post_id":    comment.PostID,
 		"author_id":  comment.AuthorID,
 		"parent_id":  comment.ParentID,
 		"created_at": comment.CreatedAt,
-	})
+	}))
 }
 
 // GetComments 获取评论树
@@ -74,11 +74,11 @@ func (c *CommentController) GetComments(ctx *gin.Context) {
 
 	comments, err := c.commentService.GetCommentTree(uint(postID), uid)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to get comments"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to get comments", err)
 		return
 	}
 
-	utils.Success(ctx, comments)
+	ctx.JSON(http.StatusOK, response.SuccessResponse(comments))
 }
 
 // Vote 点赞/取消点赞
@@ -92,7 +92,7 @@ func (c *CommentController) Vote(ctx *gin.Context) {
 
 	var req request.VoteActionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
+		utils.BadRequest(ctx, "invalid request parameters")
 		return
 	}
 
@@ -100,11 +100,30 @@ func (c *CommentController) Vote(ctx *gin.Context) {
 
 	voteResp, err := c.voteService.Vote(userID, uint(commentID), req.Action)
 	if err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "failed to vote"))
+		utils.HandleError(ctx, http.StatusBadRequest, "vote operation failed", err)
 		return
 	}
 
-	utils.Success(ctx, voteResp)
+	ctx.JSON(http.StatusOK, response.SuccessResponse(voteResp))
+}
+
+// DeleteComment 删除评论
+func (c *CommentController) DeleteComment(ctx *gin.Context) {
+	commentIDStr := ctx.Param("id")
+	commentID, err := strconv.ParseUint(commentIDStr, 10, 32)
+	if err != nil {
+		utils.BadRequest(ctx, "invalid comment id")
+		return
+	}
+
+	userID := ctx.GetUint("user_id")
+
+	if err := c.commentService.DeleteComment(uint(commentID), userID); err != nil {
+		utils.HandleError(ctx, http.StatusBadRequest, "failed to delete comment", err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, response.SuccessResponse(nil))
 }
 
 // GetVotes 获取点赞数
@@ -125,9 +144,9 @@ func (c *CommentController) GetVotes(ctx *gin.Context) {
 
 	voteResp, err := c.voteService.GetVoteInfo(uint(commentID), uid)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to get vote info"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to get vote info", err)
 		return
 	}
 
-	utils.Success(ctx, voteResp)
+	ctx.JSON(http.StatusOK, response.SuccessResponse(voteResp))
 }

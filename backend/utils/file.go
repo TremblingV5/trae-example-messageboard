@@ -8,15 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 // SaveFile 保存上传的文件
 func SaveFile(file *multipart.FileHeader, subDir string) (string, error) {
-	// Validate file type before saving
+	// Validate file extension before saving
 	if !IsImageFile(file.Filename) {
-		return "", fmt.Errorf("file type not allowed, only image files are accepted")
+		return "", fmt.Errorf("file type not allowed: %s", file.Filename)
 	}
 
 	// Create upload directory if not exists
@@ -31,7 +29,19 @@ func SaveFile(file *multipart.FileHeader, subDir string) (string, error) {
 	savePath := filepath.Join(uploadDir, filename)
 
 	// Save file
-	if err := gin.SaveUploadedFile(file, savePath); err != nil {
+	src, err := file.Open()
+	if err != nil {
+		return "", fmt.Errorf("failed to open uploaded file: %v", err)
+	}
+	defer src.Close()
+
+	dst, err := os.Create(savePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create destination file: %v", err)
+	}
+	defer dst.Close()
+
+	if _, err := dst.ReadFrom(src); err != nil {
 		return "", fmt.Errorf("failed to save file: %v", err)
 	}
 

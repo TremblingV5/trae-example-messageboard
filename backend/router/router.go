@@ -67,6 +67,8 @@ func SetupRouter() *gin.Engine {
 			posts.POST("", middleware.AuthMiddleware(), postController.CreatePost)
 			posts.POST("/upload", middleware.AuthMiddleware(), postController.UploadPostImage)
 			posts.GET("/:id", postController.GetPost)
+			posts.PUT("/:id", middleware.AuthMiddleware(), postController.UpdatePost)
+			posts.DELETE("/:id", middleware.AuthMiddleware(), postController.DeletePost)
 		}
 
 		// Comment routes (nested under posts)
@@ -76,11 +78,12 @@ func SetupRouter() *gin.Engine {
 			postsComments.GET("/:id/comments", middleware.OptionalAuth(), commentController.GetComments)
 		}
 
-		// Vote routes
+		// Comment routes (standalone)
 		comments := api.Group("/comments")
 		{
 			comments.POST("/:id/vote", middleware.AuthMiddleware(), commentController.Vote)
 			comments.GET("/:id/votes", middleware.OptionalAuth(), commentController.GetVotes)
+			comments.DELETE("/:id", middleware.AuthMiddleware(), commentController.DeleteComment)
 		}
 	}
 

@@ -1,8 +1,8 @@
 package response
 
 import (
-	"messageboard/config"
 	"messageboard/model"
+	"time"
 )
 
 // Response 统一响应格式
@@ -40,11 +40,11 @@ func ErrorResponse(code int, message string) Response {
 
 // 常用错误响应
 var (
-	BadRequestResponse          = ErrorResponse(400, "bad request")
-	UnauthorizedResponse        = ErrorResponse(401, "unauthorized")
-	ForbiddenResponse           = ErrorResponse(403, "forbidden")
-	NotFoundResponse            = ErrorResponse(404, "not found")
-	InternalServerErrorResponse  = ErrorResponse(500, "internal server error")
+	BadRequestResponse       = ErrorResponse(400, "bad request")
+	UnauthorizedResponse     = ErrorResponse(401, "unauthorized")
+	ForbiddenResponse        = ErrorResponse(403, "forbidden")
+	NotFoundResponse         = ErrorResponse(404, "not found")
+	InternalServerErrorResponse = ErrorResponse(500, "internal server error")
 )
 
 // LoginResponse 登录响应
@@ -63,27 +63,6 @@ type UserResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// NewUserResponse 从 model.User 构造 UserResponse
-func NewUserResponse(user *model.User) UserResponse {
-	return UserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Nickname:  user.Nickname,
-		Avatar:    user.Avatar,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}
-}
-
-// NewUserResponsePtr 从 model.User 构造 *UserResponse
-func NewUserResponsePtr(user *model.User) *UserResponse {
-	if user == nil {
-		return nil
-	}
-	resp := NewUserResponse(user)
-	return &resp
-}
-
 // PostResponse 帖子响应
 type PostResponse struct {
 	ID        uint          `json:"id"`
@@ -97,23 +76,24 @@ type PostResponse struct {
 
 // PostListResponse 帖子列表响应
 type PostListResponse struct {
-	Posts    []PostResponse `json:"posts"`
-	Total    int64          `json:"total"`
-	Page     int            `json:"page"`
-	PageSize int            `json:"page_size"`
+	Posts     []PostResponse `json:"posts"`
+	Total     int64          `json:"total"`
+	Page      int            `json:"page"`
+	PageSize  int            `json:"page_size"`
 }
 
 // CommentResponse 评论响应
 type CommentResponse struct {
-	ID        uint              `json:"id"`
-	Content   string            `json:"content"`
-	PostID    uint              `json:"post_id"`
-	Author    *UserResponse     `json:"author,omitempty"`
-	ParentID  *uint             `json:"parent_id"`
-	Children  []CommentResponse `json:"children,omitempty"`
-	VoteCount int               `json:"vote_count"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	ID         uint              `json:"id"`
+	Content    string            `json:"content"`
+	PostID     uint              `json:"post_id"`
+	Author     *UserResponse     `json:"author,omitempty"`
+	ParentID   *uint             `json:"parent_id"`
+	Children   []CommentResponse `json:"children,omitempty"`
+	VoteCount  int               `json:"vote_count"`
+	VotedValue int               `json:"voted_value"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
 // VoteResponse 点赞响应
@@ -123,13 +103,26 @@ type VoteResponse struct {
 	Value     int  `json:"value"` // 1: upvote, -1: downvote, 0: not voted
 }
 
-// SafeError 在生产环境返回通用错误消息，开发环境返回详细错误
-func SafeError(err error, genericMsg string) string {
-	if err == nil {
-		return ""
+// NewUserResponse 从 model.User 创建 UserResponse
+func NewUserResponse(user *model.User) UserResponse {
+	if user == nil {
+		return UserResponse{}
 	}
-	if config.AppConfig != nil && config.AppConfig.Server.Mode != "release" {
-		return err.Error()
+	return UserResponse{
+		ID:        user.ID,
+		Username:  user.Username,
+		Nickname:  user.Nickname,
+		Avatar:    user.Avatar,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
 	}
-	return genericMsg
+}
+
+// NewUserResponsePtr 从 model.User 创建 *UserResponse
+func NewUserResponsePtr(user *model.User) *UserResponse {
+	if user == nil {
+		return nil
+	}
+	resp := NewUserResponse(user)
+	return &resp
 }

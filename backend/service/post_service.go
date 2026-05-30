@@ -52,7 +52,7 @@ func (s *PostService) GetPostList(page, pageSize int) (*response.PostListRespons
 
 	postResponses := make([]response.PostResponse, len(posts))
 	for i, post := range posts {
-		postResponses[i] = s.ToPostResponse(&post)
+		postResponses[i] = s.toPostResponse(&post)
 	}
 
 	return &response.PostListResponse{
@@ -78,7 +78,7 @@ func (s *PostService) SearchPosts(keyword string, page, pageSize int) (*response
 
 	postResponses := make([]response.PostResponse, len(posts))
 	for i, post := range posts {
-		postResponses[i] = s.ToPostResponse(&post)
+		postResponses[i] = s.toPostResponse(&post)
 	}
 
 	return &response.PostListResponse{
@@ -123,8 +123,7 @@ func (s *PostService) DeletePost(id uint, authorID uint) error {
 	return s.postRepo.Delete(id)
 }
 
-// ToPostResponse 将 model.Post 转换为 response.PostResponse
-func (s *PostService) ToPostResponse(post *model.Post) response.PostResponse {
+func (s *PostService) toPostResponse(post *model.Post) response.PostResponse {
 	return response.PostResponse{
 		ID:        post.ID,
 		Title:     post.Title,

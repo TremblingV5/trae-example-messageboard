@@ -10,8 +10,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// parseToken 解析 JWT token，返回 claims 和错误
-func parseToken(tokenString string) (jwt.MapClaims, error) {
+// parseToken 解析 JWT token，返回 user_id 和是否解析成功
+func parseToken(authHeader string) (uint, bool) {
+	// Check Bearer prefix
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return 0, false
+	}
+
+	tokenString := parts[1]
+
+	// Parse and validate token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
@@ -19,34 +28,23 @@ func parseToken(tokenString string) (jwt.MapClaims, error) {
 		return []byte(model.GetJWTSecret()), nil
 	})
 
-	if err != nil {
-		return nil, err
+	if err != nil || !token.Valid {
+		return 0, false
 	}
 
-	if !token.Valid {
-		return nil, jwt.ErrSignatureInvalid
-	}
-
+	// Extract claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, jwt.ErrSignatureInvalid
+		return 0, false
 	}
 
-	return claims, nil
-}
-
-// extractTokenFromHeader 从 Authorization 头中提取 Bearer token
-func extractTokenFromHeader(authHeader string) (string, bool) {
-	if authHeader == "" {
-		return "", false
+	// Get user_id from claims
+	userIDFloat, ok := claims["user_id"].(float64)
+	if !ok {
+		return 0, false
 	}
 
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", false
-	}
-
-	return parts[1], true
+	return uint(userIDFloat), true
 }
 
 // AuthMiddleware JWT 认证中间件
@@ -59,28 +57,14 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		tokenString, valid := extractTokenFromHeader(authHeader)
-		if !valid {
-			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "invalid authorization header format"))
-			ctx.Abort()
-			return
-		}
-
-		claims, err := parseToken(tokenString)
-		if err != nil {
+		userID, ok := parseToken(authHeader)
+		if !ok {
 			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "invalid token"))
 			ctx.Abort()
 			return
 		}
 
-		userIDFloat, ok := claims["user_id"].(float64)
-		if !ok {
-			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "user_id not found in token"))
-			ctx.Abort()
-			return
-		}
-
-		ctx.Set("user_id", uint(userIDFloat))
+		ctx.Set("user_id", userID)
 		ctx.Next()
 	}
 }
@@ -94,25 +78,11 @@ func OptionalAuth() gin.HandlerFunc {
 			return
 		}
 
-		tokenString, valid := extractTokenFromHeader(authHeader)
-		if !valid {
-			ctx.Next()
-			return
+		userID, ok := parseToken(authHeader)
+		if ok {
+			ctx.Set("user_id", userID)
 		}
 
-		claims, err := parseToken(tokenString)
-		if err != nil {
-			ctx.Next()
-			return
-		}
-
-		userIDFloat, ok := claims["user_id"].(float64)
-		if !ok {
-			ctx.Next()
-			return
-		}
-
-		ctx.Set("user_id", uint(userIDFloat))
 		ctx.Next()
 	}
 }

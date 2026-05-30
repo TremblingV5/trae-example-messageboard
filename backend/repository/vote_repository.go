@@ -47,51 +47,8 @@ func (r *VoteRepository) GetVoteCount(commentID uint) (int, error) {
 	return result.Total, err
 }
 
-// BatchGetVoteCounts 批量获取多个评论的投票数
-func (r *VoteRepository) BatchGetVoteCounts(commentIDs []uint) (map[uint]int, error) {
-	result := make(map[uint]int)
-	if len(commentIDs) == 0 {
-		return result, nil
-	}
-
-	type VoteCount struct {
-		CommentID uint `gorm:"column:comment_id"`
-		Total     int  `gorm:"column:total"`
-	}
-
-	var counts []VoteCount
-	err := r.db.Model(&model.Vote{}).
-		Select("comment_id, COALESCE(SUM(value), 0) as total").
-		Where("comment_id IN ?", commentIDs).
-		Group("comment_id").
-		Find(&counts).Error
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range counts {
-		result[c.CommentID] = c.Total
-	}
-	return result, nil
-}
-
-// BatchGetUserVotes 批量获取用户对多个评论的投票状态
-func (r *VoteRepository) BatchGetUserVotes(userID uint, commentIDs []uint) (map[uint]int, error) {
-	result := make(map[uint]int)
-	if len(commentIDs) == 0 {
-		return result, nil
-	}
-
-	var votes []model.Vote
-	err := r.db.Where("user_id = ? AND comment_id IN ?", userID, commentIDs).Find(&votes).Error
-	if err != nil {
-		return nil, err
-	}
-
-	for _, v := range votes {
-		result[v.CommentID] = v.Value
-	}
-	return result, nil
+func (r *VoteRepository) DeleteByUserAndComment(userID, commentID uint) error {
+	return r.db.Where("user_id = ? AND comment_id = ?", userID, commentID).Delete(&model.Vote{}).Error
 }
 
 // GetUserVote 获取用户对评论的投票状态
@@ -104,4 +61,51 @@ func (r *VoteRepository) GetUserVote(userID, commentID uint) (int, error) {
 		return 0, err
 	}
 	return vote.Value, nil
+}
+
+// BatchGetVoteCount 批量获取多个评论的投票数
+func (r *VoteRepository) BatchGetVoteCount(commentIDs []uint) (map[uint]int, error) {
+	if len(commentIDs) == 0 {
+		return make(map[uint]int), nil
+	}
+
+	type result struct {
+		CommentID uint `gorm:"column:comment_id"`
+		Total     int  `gorm:"column:total"`
+	}
+	var results []result
+	err := r.db.Model(&model.Vote{}).
+		Select("comment_id, COALESCE(SUM(value), 0) as total").
+		Where("comment_id IN ?", commentIDs).
+		Group("comment_id").
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+
+	countMap := make(map[uint]int, len(results))
+	for _, r := range results {
+		countMap[r.CommentID] = r.Total
+	}
+	return countMap, nil
+}
+
+// BatchGetUserVotes 批量获取用户对多个评论的投票状态
+func (r *VoteRepository) BatchGetUserVotes(userID uint, commentIDs []uint) (map[uint]int, error) {
+	if len(commentIDs) == 0 {
+		return make(map[uint]int), nil
+	}
+
+	var votes []model.Vote
+	err := r.db.Where("user_id = ? AND comment_id IN ?", userID, commentIDs).
+		Find(&votes).Error
+	if err != nil {
+		return nil, err
+	}
+
+	voteMap := make(map[uint]int, len(votes))
+	for _, v := range votes {
+		voteMap[v.CommentID] = v.Value
+	}
+	return voteMap, nil
 }

@@ -24,7 +24,7 @@ func NewPostController(postService *service.PostService) *PostController {
 func (c *PostController) CreatePost(ctx *gin.Context) {
 	var req request.CreatePostRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
+		utils.BadRequest(ctx, "invalid request parameters")
 		return
 	}
 
@@ -32,25 +32,25 @@ func (c *PostController) CreatePost(ctx *gin.Context) {
 
 	post, err := c.postService.CreatePost(userID, &req)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to create post"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to create post", err)
 		return
 	}
 
-	utils.Created(ctx, response.PostResponse{
+	ctx.JSON(http.StatusCreated, response.SuccessResponse(response.PostResponse{
 		ID:        post.ID,
 		Title:     post.Title,
 		Content:   post.Content,
 		ImageURL:  post.ImageURL,
 		CreatedAt: post.CreatedAt,
 		UpdatedAt: post.UpdatedAt,
-	})
+	}))
 }
 
 // GetPostList 获取帖子列表
 func (c *PostController) GetPostList(ctx *gin.Context) {
 	var req request.PostListRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
+		utils.BadRequest(ctx, "invalid request parameters")
 		return
 	}
 
@@ -64,11 +64,11 @@ func (c *PostController) GetPostList(ctx *gin.Context) {
 
 	list, err := c.postService.GetPostList(req.Page, req.PageSize)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to get post list"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to get post list", err)
 		return
 	}
 
-	utils.Success(ctx, list)
+	ctx.JSON(http.StatusOK, response.SuccessResponse(list))
 }
 
 // GetPost 获取帖子详情
@@ -82,18 +82,26 @@ func (c *PostController) GetPost(ctx *gin.Context) {
 
 	post, err := c.postService.GetPostByID(uint(id))
 	if err != nil {
-		utils.NotFound(ctx, "post not found")
+		utils.HandleError(ctx, http.StatusNotFound, "post not found", err)
 		return
 	}
 
-	utils.Success(ctx, c.postService.ToPostResponse(post))
+	ctx.JSON(http.StatusOK, response.SuccessResponse(response.PostResponse{
+		ID:        post.ID,
+		Title:     post.Title,
+		Content:   post.Content,
+		Author:    response.NewUserResponsePtr(post.Author),
+		ImageURL:  post.ImageURL,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+	}))
 }
 
 // SearchPosts 搜索帖子
 func (c *PostController) SearchPosts(ctx *gin.Context) {
 	var req request.SearchPostRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
+		utils.BadRequest(ctx, "invalid request parameters")
 		return
 	}
 
@@ -107,11 +115,11 @@ func (c *PostController) SearchPosts(ctx *gin.Context) {
 
 	list, err := c.postService.SearchPosts(req.Keyword, req.Page, req.PageSize)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to search posts"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to search posts", err)
 		return
 	}
 
-	utils.Success(ctx, list)
+	ctx.JSON(http.StatusOK, response.SuccessResponse(list))
 }
 
 // UploadPostImage 上传帖子图片
@@ -132,11 +140,63 @@ func (c *PostController) UploadPostImage(ctx *gin.Context) {
 	// Save file
 	imageURL, err := utils.SaveFile(file, "posts")
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to upload image"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to upload image", err)
 		return
 	}
 
-	utils.Success(ctx, gin.H{
+	ctx.JSON(http.StatusOK, response.SuccessResponse(gin.H{
 		"image_url": imageURL,
-	})
+	}))
+}
+
+// UpdatePost 更新帖子
+func (c *PostController) UpdatePost(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		utils.BadRequest(ctx, "invalid post id")
+		return
+	}
+
+	var req request.CreatePostRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(ctx, "invalid request parameters")
+		return
+	}
+
+	userID := ctx.GetUint("user_id")
+
+	post, err := c.postService.UpdatePost(uint(id), userID, &req)
+	if err != nil {
+		utils.HandleError(ctx, http.StatusBadRequest, "failed to update post", err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, response.SuccessResponse(response.PostResponse{
+		ID:        post.ID,
+		Title:     post.Title,
+		Content:   post.Content,
+		ImageURL:  post.ImageURL,
+		CreatedAt: post.CreatedAt,
+		UpdatedAt: post.UpdatedAt,
+	}))
+}
+
+// DeletePost 删除帖子
+func (c *PostController) DeletePost(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		utils.BadRequest(ctx, "invalid post id")
+		return
+	}
+
+	userID := ctx.GetUint("user_id")
+
+	if err := c.postService.DeletePost(uint(id), userID); err != nil {
+		utils.HandleError(ctx, http.StatusBadRequest, "failed to delete post", err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, response.SuccessResponse(nil))
 }

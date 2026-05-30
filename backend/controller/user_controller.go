@@ -31,11 +31,11 @@ func (c *UserController) GetUser(ctx *gin.Context) {
 
 	user, err := c.authService.GetUserByID(uint(id))
 	if err != nil {
-		utils.NotFound(ctx, "user not found")
+		utils.HandleError(ctx, http.StatusNotFound, "user not found", err)
 		return
 	}
 
-	utils.Success(ctx, response.NewUserResponse(user))
+	ctx.JSON(http.StatusOK, response.SuccessResponse(response.NewUserResponse(user)))
 }
 
 // UpdateUser 更新用户信息
@@ -50,23 +50,23 @@ func (c *UserController) UpdateUser(ctx *gin.Context) {
 	// Get current user from context
 	userID := ctx.GetUint("user_id")
 	if userID != uint(id) {
-		utils.Forbidden(ctx, "cannot update other user\'s profile")
+		utils.Forbidden(ctx, "cannot update other user's profile")
 		return
 	}
 
 	var req request.UpdateUserRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
+		utils.BadRequest(ctx, "invalid request parameters")
 		return
 	}
 
 	user, err := c.authService.UpdateUser(uint(id), &req)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to update user"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to update user", err)
 		return
 	}
 
-	utils.Success(ctx, response.NewUserResponse(user))
+	ctx.JSON(http.StatusOK, response.SuccessResponse(response.NewUserResponse(user)))
 }
 
 // UploadAvatar 上传头像
@@ -81,7 +81,7 @@ func (c *UserController) UploadAvatar(ctx *gin.Context) {
 	// Get current user from context
 	userID := ctx.GetUint("user_id")
 	if userID != uint(id) {
-		utils.Forbidden(ctx, "cannot update other user\'s avatar")
+		utils.Forbidden(ctx, "cannot update other user's avatar")
 		return
 	}
 
@@ -101,18 +101,18 @@ func (c *UserController) UploadAvatar(ctx *gin.Context) {
 	// Save file
 	avatarURL, err := utils.SaveFile(file, "avatars")
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to upload avatar"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to upload avatar", err)
 		return
 	}
 
 	user, err := c.authService.UpdateAvatar(uint(id), avatarURL)
 	if err != nil {
-		utils.InternalError(ctx, response.SafeError(err, "failed to update avatar"))
+		utils.HandleError(ctx, http.StatusInternalServerError, "failed to update avatar", err)
 		return
 	}
 
-	utils.Success(ctx, gin.H{
+	ctx.JSON(http.StatusOK, response.SuccessResponse(gin.H{
 		"avatar_url": avatarURL,
 		"user":       response.NewUserResponse(user),
-	})
+	}))
 }
