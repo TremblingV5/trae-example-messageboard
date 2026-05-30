@@ -14,6 +14,11 @@ import (
 
 // SaveFile 保存上传的文件
 func SaveFile(file *multipart.FileHeader, subDir string) (string, error) {
+	// Validate file type before saving
+	if !IsImageFile(file.Filename) {
+		return "", fmt.Errorf("file type not allowed, only image files are accepted")
+	}
+
 	// Create upload directory if not exists
 	uploadDir := filepath.Join(config.AppConfig.Upload.UploadDir, subDir)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
@@ -23,10 +28,10 @@ func SaveFile(file *multipart.FileHeader, subDir string) (string, error) {
 	// Generate unique filename
 	ext := filepath.Ext(file.Filename)
 	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-	filepath := filepath.Join(uploadDir, filename)
+	savePath := filepath.Join(uploadDir, filename)
 
 	// Save file
-	if err := gin.SaveUploadedFile(file, filepath); err != nil {
+	if err := gin.SaveUploadedFile(file, savePath); err != nil {
 		return "", fmt.Errorf("failed to save file: %v", err)
 	}
 
