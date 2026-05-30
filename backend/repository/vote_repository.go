@@ -47,10 +47,6 @@ func (r *VoteRepository) GetVoteCount(commentID uint) (int, error) {
 	return result.Total, err
 }
 
-func (r *VoteRepository) DeleteByUserAndComment(userID, commentID uint) error {
-	return r.db.Where("user_id = ? AND comment_id = ?", userID, commentID).Delete(&model.Vote{}).Error
-}
-
 // GetUserVote 获取用户对评论的投票状态
 func (r *VoteRepository) GetUserVote(userID, commentID uint) (int, error) {
 	vote, err := r.FindByUserAndComment(userID, commentID)
