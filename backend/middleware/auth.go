@@ -10,6 +10,45 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// parseToken 解析 JWT token，返回 claims 和错误
+func parseToken(tokenString string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(model.GetJWTSecret()), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.Valid {
+		return nil, jwt.ErrSignatureInvalid
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, jwt.ErrSignatureInvalid
+	}
+
+	return claims, nil
+}
+
+// extractTokenFromHeader 从 Authorization 头中提取 Bearer token
+func extractTokenFromHeader(authHeader string) (string, bool) {
+	if authHeader == "" {
+		return "", false
+	}
+
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", false
+	}
+
+	return parts[1], true
+}
+
 // AuthMiddleware JWT 认证中间件
 func AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
@@ -20,45 +59,20 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Check Bearer prefix
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		tokenString, valid := extractTokenFromHeader(authHeader)
+		if !valid {
 			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "invalid authorization header format"))
 			ctx.Abort()
 			return
 		}
 
-		tokenString := parts[1]
-
-		// Parse and validate token
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(model.GetJWTSecret()), nil
-		})
-
+		claims, err := parseToken(tokenString)
 		if err != nil {
 			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "invalid token"))
 			ctx.Abort()
 			return
 		}
 
-		if !token.Valid {
-			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "token is invalid"))
-			ctx.Abort()
-			return
-		}
-
-		// Extract claims
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "invalid token claims"))
-			ctx.Abort()
-			return
-		}
-
-		// Get user_id from claims
 		userIDFloat, ok := claims["user_id"].(float64)
 		if !ok {
 			ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, "user_id not found in token"))
@@ -66,9 +80,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		userID := uint(userIDFloat)
-		ctx.Set("user_id", userID)
-
+		ctx.Set("user_id", uint(userIDFloat))
 		ctx.Next()
 	}
 }
@@ -82,45 +94,25 @@ func OptionalAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Check Bearer prefix
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		tokenString, valid := extractTokenFromHeader(authHeader)
+		if !valid {
 			ctx.Next()
 			return
 		}
 
-		tokenString := parts[1]
-
-		// Parse and validate token
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(model.GetJWTSecret()), nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := parseToken(tokenString)
+		if err != nil {
 			ctx.Next()
 			return
 		}
 
-		// Extract claims
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			ctx.Next()
-			return
-		}
-
-		// Get user_id from claims
 		userIDFloat, ok := claims["user_id"].(float64)
 		if !ok {
 			ctx.Next()
 			return
 		}
 
-		userID := uint(userIDFloat)
-		ctx.Set("user_id", userID)
-
+		ctx.Set("user_id", uint(userIDFloat))
 		ctx.Next()
 	}
 }
