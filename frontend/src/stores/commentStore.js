@@ -11,13 +11,13 @@ const useCommentStore = create((set, get) => ({
   fetchComments: async (postId) => {
     set({ loading: true, error: null });
     try {
-      const response = await commentService.getComments(postId);
-      const comments = response.data || [];      
+      // api.js 拦截器已解包，response 就是评论数组
+      const comments = await commentService.getComments(postId);
       set({
-        comments,
+        comments: comments || [],
         loading: false,
       });
-      
+
       return comments;
     } catch (error) {
       set({ error: error.message, loading: false });
@@ -29,14 +29,13 @@ const useCommentStore = create((set, get) => ({
   createComment: async (postId, data) => {
     set({ loading: true, error: null });
     try {
-      const response = await commentService.createComment(postId, data);
-      const newComment = response.data;
-      
+      // api.js 拦截器已解包
+      await commentService.createComment(postId, data);
+
       // 刷新评论列表
       await get().fetchComments(postId);
-      
+
       set({ loading: false, replyingTo: null });
-      return newComment;
     } catch (error) {
       set({ error: error.message, loading: false });
       throw error;
@@ -46,8 +45,9 @@ const useCommentStore = create((set, get) => ({
   // 点赞评论
   voteComment: async (commentId, action) => {
     try {
-      const response = await commentService.voteComment(commentId, action);
-      return response.data;
+      // api.js 拦截器已解包，response 就是 { vote_count, voted, value }
+      const result = await commentService.voteComment(commentId, action);
+      return result;
     } catch (error) {
       throw error;
     }
