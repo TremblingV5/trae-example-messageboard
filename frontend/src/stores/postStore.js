@@ -8,7 +8,7 @@ const usePostStore = create((set, get) => ({
     page: 1,
     pageSize: 10,
     total: 0,
-  totalPages: 0,
+    totalPages: 0,
   },
   loading: false,
   error: null,
@@ -17,14 +17,13 @@ const usePostStore = create((set, get) => ({
   fetchPosts: async (params = {}) => {
     set({ loading: true, error: null });
     try {
-      const response = await postService.getPosts({
+      // api.js 拦截器已解包，response 就是 { posts, total, page, page_size }
+      const data = await postService.getPosts({
         page: params.page || get().pagination.page,
         pageSize: params.pageSize || get().pagination.pageSize,
         keyword: params.keyword,
       });
-      
-      const data = response.data;
-      
+
       set({
         posts: data.posts || [],
         pagination: {
@@ -35,8 +34,8 @@ const usePostStore = create((set, get) => ({
         },
         loading: false,
       });
-      
-      return response;
+
+      return data;
     } catch (error) {
       set({ error: error.message, loading: false });
       throw error;
@@ -47,9 +46,10 @@ const usePostStore = create((set, get) => ({
   fetchPostById: async (id) => {
     set({ loading: true, error: null });
     try {
-      const response = await postService.getPostById(id);
-      set({ currentPost: response.data, loading: false });
-      return response.data;
+      // api.js 拦截器已解包，response 就是帖子对象
+      const post = await postService.getPostById(id);
+      set({ currentPost: post, loading: false });
+      return post;
     } catch (error) {
       set({ error: error.message, loading: false });
       throw error;
@@ -60,8 +60,8 @@ const usePostStore = create((set, get) => ({
   createPost: async (data) => {
     set({ loading: true, error: null });
     try {
-      const response = await postService.createPost(data);
-      const newPost = response.data;
+      // api.js 拦截器已解包，response 就是新帖子对象
+      const newPost = await postService.createPost(data);
       set((state) => ({
         posts: [newPost, ...state.posts],
         loading: false,
@@ -77,14 +77,13 @@ const usePostStore = create((set, get) => ({
   searchPosts: async (keyword, params = {}) => {
     set({ loading: true, error: null });
     try {
-      const response = await postService.searchPosts({
+      // api.js 拦截器已解包，response 就是 { posts, total, page, page_size }
+      const data = await postService.searchPosts({
         keyword,
         page: params.page || 1,
         pageSize: params.pageSize || 10,
       });
-      
-      const data = response.data;
-      
+
       set({
         posts: data.posts || [],
         pagination: {
@@ -95,8 +94,8 @@ const usePostStore = create((set, get) => ({
         },
         loading: false,
       });
-      
-      return response;
+
+      return data;
     } catch (error) {
       set({ error: error.message, loading: false });
       throw error;
