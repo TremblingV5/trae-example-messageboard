@@ -1,71 +1,65 @@
-import React from 'react';
-import { Form, Input, Button, Card, Typography, message } from 'antd';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Form, Input, Button, Card, Typography, Upload, message } from 'antd';
+import { InboxOutlined } from '@ant-design/icons';
 import { usePostStore } from '@/stores';
+import * as postService from '@/services/postService';
 
 const { Title } = Typography;
 const { TextArea } = Input;
+const { Dragger } = Upload;
 
 const CreatePost = () => {
   const navigate = useNavigate();
-  const { createPost, loading } = usePostStore();
-  const [form] = Form.useForm();
+  const { createPost } = usePostStore();
+  const [loading, setLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
 
   const handleSubmit = async (values) => {
+    setLoading(true);
     try {
-      const newPost = await createPost(values);
-      message.success('帖子创建成功');
-      navigate(`/posts/${newPost.id}`, { replace: true });
-    } catch (error) {
-      message.error('创建帖子失败');
+      await createPost({ ...values, image_url: imageUrl });
+      message.success('发帖成功');
+      navigate('/');
+    } catch (err) {
+      message.error('发帖失败');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleUpload = async (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await postService.uploadPostImage(formData);
+      setImageUrl(res.image_url);
+      message.success('图片上传成功');
+    } catch (err) {
+      message.error('图片上传失败');
+    }
+    return false;
+  };
+
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <Title level={3}>创建帖子</Title>
-
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px' }}>
       <Card>
-        <Form
-          form={form}
-          onFinish={handleSubmit}
-          layout="vertical"
-          autoComplete="off"
-        >
-          <Form.Item
-            name="title"
-            label="标题"
-            rules={[
-              { required: true, message: '请输入帖子标题' },
-              { max: 100, message: '标题最多100个字符' },
-            ]}
-          >
-            <Input placeholder="请输入帖子标题" size="large" />
+        <Title level={3}>创建帖子</Title>
+        <Form onFinish={handleSubmit} layout="vertical" size="large">
+          <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}>
+            <Input placeholder="请输入帖子标题" />
           </Form.Item>
-
-          <Form.Item
-            name="content"
-            label="内容"
-            rules={[
-              { required: true, message: '请输入帖子内容' },
-              { min: 1, message: '内容不能为空' },
-            ]}
-          >
-            <TextArea
-              rows={12}
-              placeholder="请输入帖子内容..."
-              showCount
-              maxLength={5000}
-            />
+          <Form.Item name="content" label="内容" rules={[{ required: true, message: '请输入内容' }]}>
+            <TextArea rows={8} placeholder="请输入帖子内容" />
           </Form.Item>
-
+          <Form.Item label="图片（可选）">
+            <Dragger accept="image/*" maxCount={1} beforeUpload={handleUpload} onRemove={() => setImageUrl('')}>
+              <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+              <p className="ant-upload-text">点击或拖拽上传图片</p>
+            </Dragger>
+          </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading}>
-              发布帖子
-            </Button>
-            <Button style={{ marginLeft: 12 }} onClick={() => navigate(-1)}>
-              取消
-            </Button>
+            <Button type="primary" htmlType="submit" loading={loading}>发布帖子</Button>
           </Form.Item>
         </Form>
       </Card>

@@ -1,126 +1,62 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Avatar, Typography, List, Tag, Spin, Empty, Pagination, Button } from 'antd';
-import { UserOutlined, EditOutlined, MessageOutlined, EyeOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { Card, Avatar, Typography, Spin, List, Tag } from 'antd';
+import { UserOutlined } from '@ant-design/icons';
 import * as userService from '@/services/userService';
-import { usePostStore } from '@/stores';
+import * as postService from '@/services/postService';
 
 const { Title, Text, Paragraph } = Typography;
 
 const UserProfile = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { posts, pagination, fetchPosts } = usePostStore();
 
   useEffect(() => {
-    const loadUser = async () => {
+    const fetchData = async () => {
       try {
-        const response = await userService.getUserById(id);
-        setUser(response.data);
-      } catch (error) {
-        console.error('Failed to load user:', error);
+        const userData = await userService.getUserById(id);
+        setUser(userData);
+        const postsData = await postService.getPosts({ page: 1, pageSize: 20 });
+        setPosts(postsData.posts || []);
+      } catch (err) {
+        console.error('Failed to fetch user data:', err);
       } finally {
         setLoading(false);
       }
     };
+    if (id) fetchData();
+  }, [id]);
 
-    loadUser();
-    fetchPosts({ page: 1, author_id: id });
-  }, [id, fetchPosts]);
-
-  const formatTime = (timeStr) => {
-    if (!timeStr) return '';
-    return new Date(timeStr).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: 48 }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Empty description="用户不存在" />;
-  }
+  if (loading) return <Spin style={{ display: 'block', margin: '100px auto' }} />;
+  if (!user) return <div style={{ textAlign: 'center', padding: 100 }}>用户不存在</div>;
 
   return (
-    <div>
-      <Button
-        type="link"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate('/')}
-        style={{ marginBottom: 16, paddingLeft: 0 }}
-      >
-        返回首页
-      </Button>
-
-      <Card style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Avatar size={64} src={user.avatar} icon={!user.avatar && <UserOutlined />} />
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px' }}>
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+          <Avatar size={80} src={user.avatar || undefined} icon={<UserOutlined />} />
           <div>
-            <Title level={3} style={{ marginBottom: 4 }}>
-              {user.nickname || user.username}
-            </Title>
-            <Text type="secondary">
-              {user.bio || '这个人很懒，什么都没留下'}
-            </Text>
-            <br />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              注册时间: {formatTime(user.created_at)}
-            </Text>
+            <Title level={3} style={{ margin: 0 }}>{user.nickname || user.username}</Title>
+            <Text type="secondary">@{user.username} | 注册于 {new Date(user.created_at).toLocaleDateString()}</Text>
           </div>
         </div>
       </Card>
-
-      <Title level={4}>TA 的帖子</Title>
-
-      {posts.length === 0 ? (
-        <Empty description="暂无帖子" />
-      ) : (
-        <>
-          <List
-            dataSource={posts}
-            renderItem={(post) => (
-              <Card
-                hoverable
-                style={{ marginBottom: 12 }}
-                onClick={() => navigate(`/posts/${post.id}`)}
-              >
-                <Title level={5} style={{ marginBottom: 4 }}>{post.title}</Title>
-                <Paragraph ellipsis={{ rows: 2 }} style={{ color: '#666', marginBottom: 8 }}>
-                  {post.content}
-                </Paragraph>
-                <div style={{ display: 'flex', gap: 12, color: '#999', fontSize: 12 }}>
-                  <span>{formatTime(post.created_at)}</span>
-                  <Tag icon={<MessageOutlined />} style={{ fontSize: 12 }}>{post.comment_count || 0}</Tag>
-                  <Tag icon={<EyeOutlined />} style={{ fontSize: 12 }}>{post.view_count || 0}</Tag>
-                </div>
-              </Card>
-            )}
-          />
-          {pagination.total > pagination.pageSize && (
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
-              <Pagination
-                current={pagination.page}
-                pageSize={pagination.pageSize}
-                total={pagination.total}
-                onChange={(page) => fetchPosts({ page, author_id: id })}
-                showTotal={(total) => `共 ${total} 条`}
-              />
-            </div>
-          )}
-        </>
-      )}
+      <Title level={4} style={{ marginTop: 24 }}>发布的帖子</Title>
+      <List
+        dataSource={posts.filter(p => p.author && String(p.author.id) === String(id))}
+        locale={{ emptyText: '暂无帖子' }}
+        renderItem={(post) => (
+          <List.Item>
+            <List.Item.Meta
+              title={<a href={`/posts/${post.id}`}>{post.title}</a>}
+              description={<Paragraph ellipsis={{ rows: 2 }}>{post.content}</Paragraph>}
+            />
+            <Tag>{new Date(post.created_at).toLocaleDateString()}</Tag>
+          </List.Item>
+        )}
+      />
     </div>
   );
 };
