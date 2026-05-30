@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as authService from '@/services/authService';
-import * as userService from '@/services/userService';
 
 const useAuthStore = create(
   persist(
@@ -24,18 +23,14 @@ const useAuthStore = create(
       login: async (credentials) => {
         set({ loading: true, error: null });
         try {
+          // api.js 拦截器已解包，response 就是 { token, expire_at }
           const response = await authService.login(credentials);
-          const { token, expire_at, user } = response.data;
+          const { token, expire_at } = response;
 
           localStorage.setItem('token', token);
 
-          // 如果登录接口返回了用户信息，直接使用
-          let userData = user;
-          if (!userData) {
-            // 否则通过 getCurrentUser 获取
-            const meResp = await authService.getCurrentUser();
-            userData = meResp.data;
-          }
+          // 通过 getCurrentUser 获取用户信息
+          const userData = await authService.getCurrentUser();
 
           set({
             user: userData,
@@ -47,7 +42,7 @@ const useAuthStore = create(
 
           return { success: true };
         } catch (error) {
-          const errorMessage = error.response?.data?.message || '登录失败';
+          const errorMessage = error.response?.data?.message || error.message || '登录失败';
           set({ error: errorMessage, loading: false });
           return { success: false, error: errorMessage };
         }
@@ -57,25 +52,19 @@ const useAuthStore = create(
       register: async (userData) => {
         set({ loading: true, error: null });
         try {
+          // api.js 拦截器已解包，response 就是用户信息对象
           const response = await authService.register(userData);
-          const { token, expire_at, user } = response.data;
 
-          // 注册成功后设置 token
-          if (token) {
-            localStorage.setItem('token', token);
-          }
-
+          // 注册成功后跳转到登录页（后端注册接口不返回 token）
           set({
-            user,
-            token,
-            expireAt: expire_at ? new Date(expire_at).getTime() : null,
-            isAuthenticated: true,
+            user: response,
+            isAuthenticated: false,
             loading: false,
           });
 
           return { success: true };
         } catch (error) {
-          const errorMessage = error.response?.data?.message || '注册失败';
+          const errorMessage = error.response?.data?.message || error.message || '注册失败';
           set({ error: errorMessage, loading: false });
           return { success: false, error: errorMessage };
         }
@@ -109,8 +98,8 @@ const useAuthStore = create(
 
         set({ loading: true });
         try {
-          const response = await authService.getCurrentUser();
-          const user = response.data;
+          // api.js 拦截器已解包，response 就是用户信息对象
+          const user = await authService.getCurrentUser();
           set({
             user,
             token,
