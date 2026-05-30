@@ -28,9 +28,11 @@ func CORS() gin.HandlerFunc {
 				ctx.Header("Access-Control-Allow-Credentials", "true")
 			}
 		} else {
-			// Development: allow all origins but without credentials
-			ctx.Header("Access-Control-Allow-Origin", "*")
-			ctx.Header("Access-Control-Allow-Credentials", "false")
+			// Development: echo back the request Origin instead of using wildcard
+			if origin != "" {
+				ctx.Header("Access-Control-Allow-Origin", origin)
+				ctx.Header("Access-Control-Allow-Credentials", "true")
+			}
 		}
 
 		ctx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
