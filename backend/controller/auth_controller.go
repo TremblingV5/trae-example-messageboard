@@ -4,6 +4,7 @@ import (
 	"messageboard/dto/request"
 	"messageboard/dto/response"
 	"messageboard/service"
+	"messageboard/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,39 +22,32 @@ func NewAuthController(authService *service.AuthService) *AuthController {
 func (c *AuthController) Register(ctx *gin.Context) {
 	var req request.RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
 	user, err := c.authService.Register(&req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "registration failed"))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, response.SuccessResponse(response.UserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Nickname:  user.Nickname,
-		Avatar:    user.Avatar,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-	}))
+	utils.Created(ctx, response.NewUserResponse(user))
 }
 
 // Login 用户登录
 func (c *AuthController) Login(ctx *gin.Context) {
 	var req request.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
 	loginResp, err := c.authService.Login(&req)
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, response.ErrorResponse(401, err.Error()))
+		utils.Unauthorized(ctx, response.SafeError(err, "login failed"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(loginResp))
+	utils.Success(ctx, loginResp)
 }
