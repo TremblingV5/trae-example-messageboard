@@ -27,7 +27,7 @@ api.interceptors.request.use(
 // 响应拦截器 - 统一错误处理
 api.interceptors.response.use(
   (response) => {
-    return response.data;
+    return response;
   },
   (error) => {
     const { response } = error;
@@ -35,11 +35,11 @@ api.interceptors.response.use(
     if (response) {
       switch (response.status) {
         case 401:
-          // Token 过期或无效
+          // Token 过期或无效 - 通过自定义事件通知 React 应用进行导航
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           message.error('登录已过期，请重新登录');
-          window.location.href = '/login';
+          window.dispatchEvent(new CustomEvent('auth:unauthorized'));
           break;
         case 403:
           message.error('没有权限访问');
