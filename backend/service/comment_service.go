@@ -74,59 +74,73 @@ func (s *CommentService) CreateComment(postID, authorID uint, content string, pa
 }
 
 func (s *CommentService) GetCommentTree(postID uint, currentUserID uint) ([]response.CommentResponse, error) {
-	// Get all root comments
-	rootComments, err := s.commentRepo.FindRootCommentsByPostID(postID)
+	// 一次性加载帖子所有评论
+	allComments, err := s.commentRepo.FindByPostID(postID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build comment tree
-	commentTree := make([]response.CommentResponse, 0, len(rootComments))
-	for _, comment := range rootComments {
-		commentResp := s.buildCommentResponse(&comment, currentUserID)
-		commentTree = append(commentTree, commentResp)
+	// 批量查询所有评论的投票信息
+	commentIDs := make([]uint, len(allComments))
+	for i, c := range allComments {
+		commentIDs[i] = c.ID
 	}
 
-	return commentTree, nil
-}
+	voteCounts, err := s.voteRepo.BatchGetVoteCounts(commentIDs)
+	if err != nil {
+		voteCounts = make(map[uint]int)
+	}
 
-func (s *CommentService) buildCommentResponse(comment *model.Comment, currentUserID uint) response.CommentResponse {
-	// Get vote count
-	voteCount, _ := s.voteRepo.GetVoteCount(comment.ID)
-
-	// Check if current user has voted
-	votedValue, _ := s.voteRepo.GetUserVote(currentUserID, comment.ID)
-
-	var author *response.UserResponse
-	if comment.Author != nil {
-		author = &response.UserResponse{
-			ID:        comment.Author.ID,
-			Username:  comment.Author.Username,
-			Nickname:  comment.Author.Nickname,
-			Avatar:    comment.Author.Avatar,
-			CreatedAt: comment.Author.CreatedAt,
-			UpdatedAt: comment.Author.UpdatedAt,
+	userVotes := make(map[uint]int)
+	if currentUserID > 0 {
+		userVotes, err = s.voteRepo.BatchGetUserVotes(currentUserID, commentIDs)
+		if err != nil {
+			userVotes = make(map[uint]int)
 		}
 	}
 
-	// Get children
-	children, _ := s.commentRepo.FindChildrenByParentID(comment.ID)
-	childResponses := make([]response.CommentResponse, 0, len(children))
-	for _, child := range children {
-		childResponses = append(childResponses, s.buildCommentResponse(&child, currentUserID))
+	// 在内存中构建树
+	commentMap := make(map[uint]*model.Comment)
+	for i := range allComments {
+		commentMap[allComments[i].ID] = &allComments[i]
 	}
 
-	return response.CommentResponse{
-		ID:        comment.ID,
-		Content:   comment.Content,
-		PostID:    comment.PostID,
-		Author:    author,
-		ParentID:  comment.ParentID,
-		Children:  childResponses,
-		VoteCount: voteCount,
-		CreatedAt: comment.CreatedAt,
-		UpdatedAt: comment.UpdatedAt,
+	// 构建评论响应映射
+	responseMap := make(map[uint]*response.CommentResponse)
+	for i := range allComments {
+		c := &allComments[i]
+		var author *response.UserResponse
+		if c.Author != nil {
+			author = response.NewUserResponsePtr(c.Author)
+		}
+
+		resp := &response.CommentResponse{
+			ID:        c.ID,
+			Content:   c.Content,
+			PostID:    c.PostID,
+			Author:    author,
+			ParentID:  c.ParentID,
+			VoteCount: voteCounts[c.ID],
+			CreatedAt: c.CreatedAt,
+			UpdatedAt: c.UpdatedAt,
+		}
+		responseMap[c.ID] = resp
 	}
+
+	// 组装树结构
+	var roots []response.CommentResponse
+	for i := range allComments {
+		c := &allComments[i]
+		resp := responseMap[c.ID]
+
+		if c.ParentID == nil {
+			roots = append(roots, *resp)
+		} else if parentResp, ok := responseMap[*c.ParentID]; ok {
+			parentResp.Children = append(parentResp.Children, *resp)
+		}
+	}
+
+	return roots, nil
 }
 
 func (s *CommentService) DeleteComment(id uint, authorID uint) error {
