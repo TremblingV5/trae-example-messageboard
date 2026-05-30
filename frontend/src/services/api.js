@@ -24,14 +24,27 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器 - 统一错误处理
+// 响应拦截器 - 统一错误处理，解包到业务数据层
 api.interceptors.response.use(
   (response) => {
-    return response;
+    // 后端统一响应格式: { code, message, data }
+    // 解包返回 data 字段，Store 中直接使用
+    const res = response.data;
+    if (res && res.code !== undefined) {
+      if (res.code === 200 || res.code === 201) {
+        return res.data !== undefined ? res.data : res;
+      }
+      // 非 200 状态码，当作错误处理
+      const error = new Error(res.message || '请求失败');
+      error.response = response;
+      return Promise.reject(error);
+    }
+    // 如果不是标准格式，直接返回
+    return res;
   },
   (error) => {
     const { response } = error;
-    
+
     if (response) {
       switch (response.status) {
         case 401:
@@ -56,7 +69,7 @@ api.interceptors.response.use(
     } else {
       message.error('网络错误，请检查网络连接');
     }
-    
+
     return Promise.reject(error);
   }
 );
