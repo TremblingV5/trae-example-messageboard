@@ -52,7 +52,7 @@ func (s *PostService) GetPostList(page, pageSize int) (*response.PostListRespons
 
 	postResponses := make([]response.PostResponse, len(posts))
 	for i, post := range posts {
-		postResponses[i] = s.toPostResponse(&post)
+		postResponses[i] = s.ToPostResponse(&post)
 	}
 
 	return &response.PostListResponse{
@@ -78,7 +78,7 @@ func (s *PostService) SearchPosts(keyword string, page, pageSize int) (*response
 
 	postResponses := make([]response.PostResponse, len(posts))
 	for i, post := range posts {
-		postResponses[i] = s.toPostResponse(&post)
+		postResponses[i] = s.ToPostResponse(&post)
 	}
 
 	return &response.PostListResponse{
@@ -123,24 +123,13 @@ func (s *PostService) DeletePost(id uint, authorID uint) error {
 	return s.postRepo.Delete(id)
 }
 
-func (s *PostService) toPostResponse(post *model.Post) response.PostResponse {
-	var author *response.UserResponse
-	if post.Author != nil {
-		author = &response.UserResponse{
-			ID:        post.Author.ID,
-			Username:  post.Author.Username,
-			Nickname:  post.Author.Nickname,
-			Avatar:    post.Author.Avatar,
-			CreatedAt: post.Author.CreatedAt,
-			UpdatedAt: post.Author.UpdatedAt,
-		}
-	}
-
+// ToPostResponse 将 model.Post 转换为 response.PostResponse
+func (s *PostService) ToPostResponse(post *model.Post) response.PostResponse {
 	return response.PostResponse{
 		ID:        post.ID,
 		Title:     post.Title,
 		Content:   post.Content,
-		Author:    author,
+		Author:    response.NewUserResponsePtr(post.Author),
 		ImageURL:  post.ImageURL,
 		CreatedAt: post.CreatedAt,
 		UpdatedAt: post.UpdatedAt,
