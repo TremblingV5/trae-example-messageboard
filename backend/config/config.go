@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"time"
 )
@@ -36,17 +37,29 @@ type UploadConfig struct {
 var AppConfig *Config
 
 func InitConfig() {
+	mode := getEnv("GIN_MODE", "debug")
+
+	jwtSecret := getEnv("JWT_SECRET", "messageboard-secret-key-2024")
+	if mode == "release" {
+		// 生产模式下强制从环境变量读取 JWT_SECRET
+		envSecret := os.Getenv("JWT_SECRET")
+		if envSecret == "" {
+			panic("JWT_SECRET environment variable is required in production mode (GIN_MODE=release)")
+		}
+		jwtSecret = envSecret
+	}
+
 	AppConfig = &Config{
 		Server: ServerConfig{
 			Port: getEnv("SERVER_PORT", "8080"),
-			Mode: getEnv("GIN_MODE", "debug"),
+			Mode: mode,
 		},
 		Database: DatabaseConfig{
 			Driver: "sqlite",
 			DSN:    getEnv("DB_DSN", "messageboard.db"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "messageboard-secret-key-2024"),
+			Secret:     jwtSecret,
 			ExpireTime: 24 * time.Hour,
 		},
 		Upload: UploadConfig{
@@ -55,6 +68,8 @@ func InitConfig() {
 			UploadDir:     getEnv("UPLOAD_DIR", "uploads"),
 		},
 	}
+
+	fmt.Printf("[config] Server running in %s mode\n", mode)
 }
 
 func getEnv(key, defaultValue string) string {
