@@ -24,7 +24,7 @@ func NewPostController(postService *service.PostService) *PostController {
 func (c *PostController) CreatePost(ctx *gin.Context) {
 	var req request.CreatePostRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
@@ -32,25 +32,25 @@ func (c *PostController) CreatePost(ctx *gin.Context) {
 
 	post, err := c.postService.CreatePost(userID, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, err.Error()))
+		utils.InternalError(ctx, response.SafeError(err, "failed to create post"))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, response.SuccessResponse(response.PostResponse{
+	utils.Created(ctx, response.PostResponse{
 		ID:        post.ID,
 		Title:     post.Title,
 		Content:   post.Content,
 		ImageURL:  post.ImageURL,
 		CreatedAt: post.CreatedAt,
 		UpdatedAt: post.UpdatedAt,
-	}))
+	})
 }
 
 // GetPostList 获取帖子列表
 func (c *PostController) GetPostList(ctx *gin.Context) {
 	var req request.PostListRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
@@ -64,11 +64,11 @@ func (c *PostController) GetPostList(ctx *gin.Context) {
 
 	list, err := c.postService.GetPostList(req.Page, req.PageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, err.Error()))
+		utils.InternalError(ctx, response.SafeError(err, "failed to get post list"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(list))
+	utils.Success(ctx, list)
 }
 
 // GetPost 获取帖子详情
@@ -76,44 +76,24 @@ func (c *PostController) GetPost(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "invalid post id"))
+		utils.BadRequest(ctx, "invalid post id")
 		return
 	}
 
 	post, err := c.postService.GetPostByID(uint(id))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, response.ErrorResponse(404, "post not found"))
+		utils.NotFound(ctx, "post not found")
 		return
 	}
 
-	var author *response.UserResponse
-	if post.Author != nil {
-		author = &response.UserResponse{
-			ID:        post.Author.ID,
-			Username:  post.Author.Username,
-			Nickname:  post.Author.Nickname,
-			Avatar:    post.Author.Avatar,
-			CreatedAt: post.Author.CreatedAt,
-			UpdatedAt: post.Author.UpdatedAt,
-		}
-	}
-
-	ctx.JSON(http.StatusOK, response.SuccessResponse(response.PostResponse{
-		ID:        post.ID,
-		Title:     post.Title,
-		Content:   post.Content,
-		Author:    author,
-		ImageURL:  post.ImageURL,
-		CreatedAt: post.CreatedAt,
-		UpdatedAt: post.UpdatedAt,
-	}))
+	utils.Success(ctx, c.postService.ToPostResponse(post))
 }
 
 // SearchPosts 搜索帖子
 func (c *PostController) SearchPosts(ctx *gin.Context) {
 	var req request.SearchPostRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, err.Error()))
+		utils.BadRequest(ctx, response.SafeError(err, "invalid request parameters"))
 		return
 	}
 
@@ -127,11 +107,11 @@ func (c *PostController) SearchPosts(ctx *gin.Context) {
 
 	list, err := c.postService.SearchPosts(req.Keyword, req.Page, req.PageSize)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, err.Error()))
+		utils.InternalError(ctx, response.SafeError(err, "failed to search posts"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(list))
+	utils.Success(ctx, list)
 }
 
 // UploadPostImage 上传帖子图片
@@ -139,24 +119,24 @@ func (c *PostController) UploadPostImage(ctx *gin.Context) {
 	// Get file from request
 	file, err := ctx.FormFile("image")
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "no file uploaded"))
+		utils.BadRequest(ctx, "no file uploaded")
 		return
 	}
 
 	// Validate file size (5MB max for post image)
 	if file.Size > model.MaxImageSize {
-		ctx.JSON(http.StatusBadRequest, response.ErrorResponse(400, "file size exceeds 5MB limit"))
+		utils.BadRequest(ctx, "file size exceeds 5MB limit")
 		return
 	}
 
 	// Save file
 	imageURL, err := utils.SaveFile(file, "posts")
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, response.ErrorResponse(500, err.Error()))
+		utils.InternalError(ctx, response.SafeError(err, "failed to upload image"))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, response.SuccessResponse(gin.H{
+	utils.Success(ctx, gin.H{
 		"image_url": imageURL,
-	}))
+	})
 }
