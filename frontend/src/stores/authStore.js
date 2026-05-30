@@ -1,36 +1,50 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as authService from '@/services/authService';
+import * as userService from '@/services/userService';
 
 const useAuthStore = create(
   persist(
     (set, get) => ({
       user: null,
       token: null,
+      expireAt: null,
       isAuthenticated: false,
       loading: false,
       error: null,
+
+      // 检查 token 是否过期
+      isTokenExpired: () => {
+        const { expireAt } = get();
+        if (!expireAt) return true;
+        return Date.now() > expireAt;
+      },
 
       // 登录
       login: async (credentials) => {
         set({ loading: true, error: null });
         try {
           const response = await authService.login(credentials);
-          const { token, expire_at } = response.data;
-          
+          const { token, expire_at, user } = response.data;
+
           localStorage.setItem('token', token);
-          
-          // 获取用户信息
-          const userResp = await authService.getUserById(credentials.username);
-          const user = userResp.data;
-          
+
+          // 如果登录接口返回了用户信息，直接使用
+          let userData = user;
+          if (!userData) {
+            // 否则通过 getCurrentUser 获取
+            const meResp = await authService.getCurrentUser();
+            userData = meResp.data;
+          }
+
           set({
-            user,
+            user: userData,
             token,
+            expireAt: expire_at ? new Date(expire_at).getTime() : null,
             isAuthenticated: true,
             loading: false,
           });
-          
+
           return { success: true };
         } catch (error) {
           const errorMessage = error.response?.data?.message || '登录失败';
@@ -44,14 +58,21 @@ const useAuthStore = create(
         set({ loading: true, error: null });
         try {
           const response = await authService.register(userData);
-          const user = response.data;
-          
+          const { token, expire_at, user } = response.data;
+
+          // 注册成功后设置 token
+          if (token) {
+            localStorage.setItem('token', token);
+          }
+
           set({
             user,
+            token,
+            expireAt: expire_at ? new Date(expire_at).getTime() : null,
             isAuthenticated: true,
             loading: false,
           });
-          
+
           return { success: true };
         } catch (error) {
           const errorMessage = error.response?.data?.message || '注册失败';
@@ -67,6 +88,7 @@ const useAuthStore = create(
         set({
           user: null,
           token: null,
+          expireAt: null,
           isAuthenticated: false,
           error: null,
         });
@@ -79,9 +101,16 @@ const useAuthStore = create(
           return;
         }
 
+        // 检查 token 是否过期
+        if (get().isTokenExpired()) {
+          get().logout();
+          return;
+        }
+
         set({ loading: true });
         try {
-          const user = await authService.getCurrentUser();
+          const response = await authService.getCurrentUser();
+          const user = response.data;
           set({
             user,
             token,
@@ -92,6 +121,7 @@ const useAuthStore = create(
           set({
             user: null,
             token: null,
+            expireAt: null,
             isAuthenticated: false,
             loading: false,
           });
@@ -115,6 +145,7 @@ const useAuthStore = create(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        expireAt: state.expireAt,
         isAuthenticated: state.isAuthenticated,
       }),
     }
