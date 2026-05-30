@@ -1,33 +1,34 @@
-import { useState, useEffect } from 'react'
-import MessageList from './components/MessageList'
-import MessageForm from './components/MessageForm'
-import { getMessages, createMessage } from './services/api'
-import './App.css'
+import React, { useEffect } from 'react';
+import { RouterProvider } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import router from '@/router';
+import { useAuthStore } from '@/stores';
+import './App.css';
 
 function App() {
-  const [messages, setMessages] = useState([])
+  const { fetchCurrentUser } = useAuthStore();
 
   useEffect(() => {
-    fetchMessages()
-  }, [])
-
-  const fetchMessages = async () => {
-    const data = await getMessages()
-    setMessages(data)
-  }
-
-  const handleSubmit = async (content) => {
-    await createMessage(content)
-    fetchMessages()
-  }
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchCurrentUser();
+    }
+  }, [fetchCurrentUser]);
 
   return (
-    <div className="app">
-      <h1>在线留言板</h1>
-      <MessageForm onSubmit={handleSubmit} />
-      <MessageList messages={messages} />
-    </div>
-  )
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: {
+          colorPrimary: '#1890ff',
+          borderRadius: 8,
+        },
+      }}
+    >
+      <RouterProvider router={router} />
+    </ConfigProvider>
+  );
 }
 
-export default App
+export default App;
